@@ -6,8 +6,16 @@ module IIF
     #   - if single line entries, first cell is the section name
     #   - if multiline entries, first cell identifies the type and they end with an ENDSECTION (ie ENDTRANS)
 
-    def multi_line_header?(head)
-      !!content[/^\!END#{head.lchomp('!')}\b/]
+    def multi_line_header?(section)
+      key = current_key(section).lchomp('!')
+      matches = section.split("\r\n").grep(/^\!/)
+      response = matches.count >= 3
+    end
+
+    def custom_header?(section)
+      key = current_key(section).lchomp('!')
+      match = section[/!END#{key}/] && section[/\bEND#{key}\b/]
+      ! match.nil?
     end
 
     def single_line_header?(head)
@@ -38,7 +46,7 @@ module IIF
           output = match.chomp('!')
 
           key = match.split("\t").first.lchomp('!')
-          has_custom_definition = scanner.check_until(/\r\nEND#{key}/)
+          has_custom_definition = scanner.check_until(/\r\nEND#{key}.*\r\n/)
           if has_custom_definition
             output += scanner.scan_until(/\r\nEND#{key}.*\r\n/)
           end
@@ -53,12 +61,6 @@ module IIF
       sections.map(&:lstrip)
     end
 
-    def custom_header?(section)
-      key = current_key(section).lchomp('!')
-      match = section[/!END#{key}/] && section[/\bEND#{key}\b/]
-      ! match.nil?
-    end
-
     def sanitize_sections
       sections.map do |section|
         sanitize_section(section)
@@ -68,10 +70,11 @@ module IIF
     def sanitize_section(section)
       key = current_key(section)
       case
+        # TODO: failing w/ multiline, ie sections not broken apart properly
+      # when multi_line_header?(section)
+      #   Section::MultiLine.new(content: section).extract
       when custom_header?(section)
         Section::SingleLineCustom.new(content: section).extract
-      when multi_line_header?(key)
-        Section::MultiLine.new(content: section).extract
       when single_line_header?(key)
         Section::SingleLine.new(content: section).extract
       else

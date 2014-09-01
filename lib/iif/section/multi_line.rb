@@ -1,45 +1,47 @@
 module IIF
   module Section
     class MultiLine < Base
-      def string_scanner
-        super
+      def string_process
+        scanner.reset
+        headers = scanner.scan_until(/^\!.*\r\n/)
+        header = sanitize_header(headers)
+        key = header.keys.first
+        key_without_bang = key.to_s.lchomp('!')
+        headers += scanner.scan_until(/^\!END#{key_without_bang}.*\r\n/) # discard end header line
+        lines = []
+
+        while !scanner.eos?
+          match = scanner.scan_until(/#{key}.*\r\n/)
+          if match.nil?
+            break
+          else
+            lines << match
+          end
+        end
+
+        {header: sanitize_full_header(headers), body: body(lines)}
       end
 
-      def extract
+      def sanitize_header(string)
+        row = split_row(string)
+        key = row.first.to_s.lchomp('!').to_sym
+        array = row[1..-1].map { |i| i.downcase.to_sym }
+        {key => array}
       end
 
-      # def extract
-      # end
+      def sanitize_full_header(string)
+        rows = string.split("\r\n").map do |row|
+          split_row(row)
+        end
 
-      # def clean_headers(heads)
-      #   normalize_rows(Array(heads), "!ENDTRNS").first.each_with_object({}) do |row, obj|
-      #     row = row.map(&:to_sym)
-      #     obj[row.first.to_s.lchomp('!').to_sym] = row[1..-1]
-      #   end
-      # end
+        rows.reject!{ |r| r.count == 1 }
 
-      # def clean_transactions(trans)
-      #   key = "ENDTRNS"
-      #   row = normalize_rows(trans, key)
-      # end
-
-      # def normalize_rows(rows, end_stub)
-      #   rows.map do |row|
-      #     row.strip
-      #     .split("\r\n")
-      #     .reject { |i| i == end_stub }
-      #     .map { |r| r.split("\t") }
-      #   end
-      # end
-
-      # def attach_key_to_values(transaction, header)
-      #   transaction.each_with_object({}) do |row, obj|
-      #     column_headers = header[row.first.to_sym].map(&:downcase)
-      #     values = row[1..-1]
-      #     hsh = column_headers.zip(values)
-      #     obj[row.first.downcase.to_sym] = Hash[hsh]
-      #   end
-      # end
+        output = rows.each_with_object({}) do |row, obj|
+          key = row.first.to_s.lchomp('!').to_sym
+          array = row[1..-1].map { |i| i.downcase.to_sym }
+          obj[key] = array
+        end
+      end
     end
   end
 end

@@ -12,7 +12,6 @@ module IIF
 
         {header: header, body: body(lines)}
       end
-      # TODO: memoize
     end
   end
 end

@@ -35,9 +35,7 @@ module IIF
 
       def extract
         header, rows = string_process.values_at(:header, :body)
-        types = rows.map { |r| r.first.to_sym }.uniq
-
-        output = hash_template(types)
+        output = hash_template(header.keys)
 
         value = rows.each_with_object(output) do |row, obj|
           key = row.first.to_sym
